@@ -5,7 +5,7 @@ module Babar
     def initialize(toodledo, json_parsed)
       @toodledo, @json_parsed = toodledo, json_parsed
       #TODO add error message
-      raise ArgumentError unless json_parsed["title"]
+      raise ArgumentError unless json_parsed["title"] or json_parsed[:title]
       @id = json_parsed["id"].to_i
     end
 
