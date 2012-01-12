@@ -26,25 +26,19 @@ module Babar
 
     attr_accessor :session_token, :toodle_token_death
 
-    def initialize(initial_args = {})
+    def initialize(toodle_uid, toodle_password, session_token = nil, toodle_token_death = nil)
       #TODO rethink this initialization
       #
       ##TODO Class-level initialization
       #
       #TODO implement uid lookup from email
-      if initial_args[:toodle_uid] and initial_args[:session_token] and initial_args[:toodle_password] and initial_args[:toodle_token_death]
-        @toodle_uid = initial_args[:toodle_uid]
-        @session_token = initial_args[:session_token]
-        @toodle_password = initial_args[:toodle_password]
-        @toodle_token_death = initial_args[:toodle_token_death]
+      @toodle_uid = initial_args[:toodle_uid]
+      @toodle_password = initial_args[:toodle_password]
 
-      elsif initial_args[:toodle_uid] and initial_args[:toodle_password]
-        #Authenticate this way
-        @toodle_uid = initial_args[:toodle_uid]
-        @toodle_password = initial_args[:toodle_password]
-        @session_token, @toodle_token_death = self.refresh_session_token
+      if session_token and toodle_token_death
+        @session_token, @toodle_token_death = session_token, toodle_token_death
       else
-        raise ArgumentError, 'Must specify :toodle_uid and :toodle_password'
+        @session_token, @toodle_token_death = refresh_session_token
       end
       
     end
