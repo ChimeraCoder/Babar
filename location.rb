@@ -7,24 +7,18 @@ module Babar
       @id = json_parsed["id"].to_i
     end
 
-    def id
-      @json_parsed['id']
+    %w(name description lat long).each do |field|
+      define_method(field) { retrieve field unless @json_parsed.has_key?(field) }
+      #The following syntax only works in Ruby 1.9 and above
+      define_method "#{field}=" do |sync_now = false|
+        @json_parsed.has_key?(field)
+        synchronize if sync_now
+      end
     end
 
-    def name
-      @json_parsed['name']
+
+    def synchronize
+      #TODO fill this in
     end
 
-    def description
-      @json_parsed['description']
-    end
-
-    def lat
-      #TODO find an appropriate type for this variable
-      @json_parsed['lat']
-    end
-    
-    def lon
-      @json_parsed['lon']
-    end
 end
