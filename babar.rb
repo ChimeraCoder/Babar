@@ -109,10 +109,28 @@ module Babar
       array_of_objects_to_post.collect{|task| task.to_json}.to_s
     end
     
-    def get(endpoint, param_map, *args)
+    def get(endpoint, param_map, desired_class=nil, delete_first_result, *args)
       url = "http://api.toodledo.com/2/#{endpoint}/get.php?key=#{self.key};" + parse_params(param_map, *args) 
-      JSON.parse(Typhoeus::Request.get(url).body)
+      array_of_results = JSON.parse(Typhoeus::Request.get(url).body)
+      array_of_results.delete_at(0) if delete_first_result
+      if desired_class
+        array_of_results.collect{|json_result| desired_class.new(self, json_result)}
+      else
+        array_of_results
+      end
     end
+
+    def modify_single(endpoint, action, param_map, desired_class=nil, delete_first_result, *args)
+      url = "http://api.toodledo.com/2/#{endpoint}/#{action}.php?key=#{self.key};" + parse_params(param_map, *args) 
+      array_of_results = JSON.parse(Typhoeus::Request.post(url).body)
+      array_of_results.delete_at(0) if delete_first_result
+      if desired_class
+        array_of_results.collect{|json_result| desired_class.new(self, json_result)}
+      else
+        array_of_results
+      end
+    end
+
 
     def modify(endpoint, action, desired_class,  array_of_hashes, array_field_name, delete_first_result, *args)
       #TODO whether to omit first
@@ -143,8 +161,7 @@ module Babar
     
     def get_tasks(param_map, *args)
       #Strip off the first element, since it is not a Task
-      array_of_json_tasks = get("tasks", param_map, *args)
-      array_of_json_tasks[1..-1].collect{|json_task| Babar::Task.new(self, json_task)}
+      get("tasks", param_map, Babar::Task, true, *args)
     end
 
 
@@ -154,7 +171,7 @@ module Babar
       #TODO enforce presence of :title attribute
       #TODO fix ugly regexes
       #TODO use proper abstraction to call a general .add() method
-      #url = "http://api.toodledo.com/2/tasks/add.php?key=#{self.key};tasks=" + CGI::escape(post_params(list_of_hash_tasks, *args).gsub("\\", "").gsub(/\s?([\{\}])\s?/, '\1').gsub(/"\{/, '{').gsub(/\}"/, '}'))
+      #url = "http://api.toodledo.com/3/tasks/add.php?key=#{self.key};tasks=" + CGI::escape(post_params(list_of_hash_tasks, *args).gsub("\\", "").gsub(/\s?([\{\}])\s?/, '\1').gsub(/"\{/, '{').gsub(/\}"/, '}'))
       add('tasks', Babar::Task, list_of_hash_tasks, 'tasks', false)
     end
     def edit_tasks(list_of_hash_tasks, *args)
@@ -183,6 +200,72 @@ module Babar
       add('locations', Babar::Location, list_of_hash_locations, 'locations', false)
     end
 
+    def edit_locations(location_hash, *args)
+      #TODO UGH there is no symmetry between this and task batch editing.
+      location_hash[:key] = self.key
+      array_of_json_locs = JSON.parse("http://api.toodledo.com/2/locations/edit.php?" + parse_params(location_hash))
+      array_of_json_locs.collect{|json_loc| Babar::Location.new(self, json_loc)}
+    end
+
+    def delete_location(location_id)
+      JSON.parse(Typhoeus::Request.post("http://api.toodledo.com/2/locations/delete.php?id=#{location_id};key=#{self.key}").body)
+    end
+
+
+    #TODO abstract these all with define_method!
+
+    def get_contexts(param_map, *args)
+      get("contexts", param_map, Babar::Context, false, *args)
+    end
+
+    def add_context(hash_context)
+      modify_single('contexts', 'add', hash_context, Babar::Context, false, *args) 
+    end
+
+    def edit_context(hash_context)
+      modify_single('contexts', 'edit', hash_context, Babar::Context, false)
+    end
+
+    def delete_context(hash_context)
+      modify_single('contexts', 'delete', hash_context, Babar::Context, false)
+    end
+
+    def get_folders(*args)
+      get('folders', {}, Babar::Folder, false, *args)
+    end
+
+    def add_folder(hash_folder, *args)
+      modify_single('folder', 'add', hash_folder, Babar::Folder, false, *args)
+    end
+
+    def edit_folder(hash_folder, *args)
+      modify_single('folder', 'edit', hash_folder, Babar::Folder, false, *args)
+    end
+
+    def delete_folder(hash_folder, *args)
+      modify_single('folder', 'delete', hash_folder, Babar::Folder, false, *args)
+    end
+
+    def get_goals(*args)
+      get('goals', {}, Babar::Goal, false, *args)
+    end
+
+    def add_goal(hash_goal, *args)
+      modify_single('goal', 'add', hash_goal, Babar::Folder, false, *args)
+    end
+
+    def edit_goal(hash_goal, *args)
+      modify_single('goal', 'edit', hash_goal, Babar::Folder, false, *args)
+    end
+
+    def delete_goal(hash_goal, *args)
+      modify_single('goal', 'delete', hash_goal, Babar::Folder, false, *args)
+    end
+
+
+
+      
+     
 
   end
 
