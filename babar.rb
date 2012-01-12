@@ -109,8 +109,9 @@ module Babar
       array_of_objects_to_post.collect{|task| task.to_json}.to_s
     end
     
-    def get(endpoint, param_map, desired_class=nil, delete_first_result, *args)
-      url = "http://api.toodledo.com/2/#{endpoint}/get.php?key=#{self.key};" + parse_params(param_map, *args) 
+    def get(endpoint, param_map, desired_class=nil, delete_first_result=false, desired_fields = [])
+      #TODO figure out a proper way to make desired_class optional
+      url = "http://api.toodledo.com/2/#{endpoint}/get.php?key=#{self.key};" + parse_params(param_map, desired_fields) 
       array_of_results = JSON.parse(Typhoeus::Request.get(url).body)
       array_of_results.delete_at(0) if delete_first_result
       if desired_class
@@ -120,8 +121,8 @@ module Babar
       end
     end
 
-    def modify_single(endpoint, action, param_map, desired_class=nil, delete_first_result, *args)
-      url = "http://api.toodledo.com/2/#{endpoint}/#{action}.php?key=#{self.key};" + parse_params(param_map, *args) 
+    def modify_single(endpoint, action, param_map, desired_class=nil, delete_first_result=false)
+      url = "http://api.toodledo.com/2/#{endpoint}/#{action}.php?key=#{self.key};" + parse_params(param_map) 
       array_of_results = JSON.parse(Typhoeus::Request.post(url).body)
       array_of_results.delete_at(0) if delete_first_result
       if desired_class
@@ -139,7 +140,7 @@ module Babar
       url = "http://api.toodledo.com/2/#{endpoint}/#{action}.php?key=#{self.key};#{array_field_name}=" + CGI::escape(post_params(array_of_hashes, *args).gsub("\\", "").gsub(/\s?([\{\}])\s?/, '\1').gsub(/"\{/, '{').gsub(/\}"/, '}'))
       array_of_results = JSON.parse(Typhoeus::Request.post(url).body)
       array_of_results.delete_at(0) if delete_first_result
-      array_of_results.collect{|json_result| desired_class.new(self, json_result}
+      array_of_results.collect{|json_result| desired_class.new(self, json_result)}
     end
 
 
@@ -183,7 +184,7 @@ module Babar
        
     def delete_tasks(list_of_task_ids, *args)
       #TODO check that this will work because array is of IDs, not hashes
-      modify(endpoint, 'delete', desired_class, array_of_hashes, array_field_name, delete_first_result, *args*)
+      modify(endpoint, 'delete', desired_class, array_of_hashes, array_field_name, delete_first_result, *args)
     end
 
 
@@ -213,7 +214,7 @@ module Babar
 
 
     #TODO abstract these all with define_method!
-
+=begin
     def get_contexts(param_map, *args)
       get("contexts", param_map, Babar::Context, false, *args)
     end
@@ -246,7 +247,7 @@ module Babar
       modify_single('folder', 'delete', hash_folder, Babar::Folder, false, *args)
     end
 
-    def get_goals(*args)
+    def get_goals()
       get('goals', {}, Babar::Goal, false, *args)
     end
 
@@ -261,8 +262,17 @@ module Babar
     def delete_goal(hash_goal, *args)
       modify_single('goal', 'delete', hash_goal, Babar::Folder, false, *args)
     end
+=end
 
-
+    %w(context folder goal).each do |list|
+      current_class = Babar::const_get(list.capitalize)
+      define_method("get_#{list}") { get("#{list}s", desired_class = current_class, delete_first_result = false) }
+      %w(add edit delete).each do |mod_endp|
+        #Hash_goal is a Hash representation of the (desired) list AFTER it is added/edited/deleted
+        #TODO in the case of deletion, make sure an ID suffices
+        define_method("#{mod_endp}_#{list}") { |hash_goal| modify_single( endpoint = "#{list}s", action = mod_endp, param_map = hash_goal, desired_class = current_class, delete_first_result = false)}
+      end
+    end
 
       
      
