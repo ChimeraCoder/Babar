@@ -13,7 +13,9 @@ module Babar
 
     %w(name).each do |field|
       define_method(field) do
-        @json_parsed.fetch(field, retrieve(field))
+        #The || is used to force retrieve to be evaluated lazily
+        #Otherwise, a new query will happen even if field is defined
+        @json_parsed.fetch(field, nil) || retrieve(field)
       end
       #The following syntax only works in Ruby 1.9 and above
       define_method "#{field}=" do |value, sync_now = false|

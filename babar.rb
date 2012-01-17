@@ -32,8 +32,8 @@ module Babar
       ##TODO Class-level initialization
       #
       #TODO implement uid lookup from email
-      @toodle_uid = initial_args[:toodle_uid]
-      @toodle_password = initial_args[:toodle_password]
+      @toodle_uid = toodle_uid
+      @toodle_password = toodle_password
 
       if session_token and toodle_token_death
         @session_token, @toodle_token_death = session_token, toodle_token_death
@@ -206,70 +206,15 @@ module Babar
       JSON.parse(Typhoeus::Request.post("http://api.toodledo.com/2/locations/delete.php?id=#{location_id};key=#{self.key}").body)
     end
 
-
-    #TODO abstract these all with define_method!
-=begin
-    def get_contexts(param_map, *args)
-      get("contexts", param_map, Babar::Context, false, *args)
-    end
-
-    def add_context(hash_context)
-      modify_single('contexts', 'add', hash_context, Babar::Context, false, *args) 
-    end
-
-    def edit_context(hash_context)
-      modify_single('contexts', 'edit', hash_context, Babar::Context, false)
-    end
-
-    def delete_context(hash_context)
-      modify_single('contexts', 'delete', hash_context, Babar::Context, false)
-    end
-
-    def get_folders(*args)
-      get('folders', {}, Babar::Folder, false, *args)
-    end
-
-    def add_folder(hash_folder, *args)
-      modify_single('folder', 'add', hash_folder, Babar::Folder, false, *args)
-    end
-
-    def edit_folder(hash_folder, *args)
-      modify_single('folder', 'edit', hash_folder, Babar::Folder, false, *args)
-    end
-
-    def delete_folder(hash_folder, *args)
-      modify_single('folder', 'delete', hash_folder, Babar::Folder, false, *args)
-    end
-
-    def get_goals()
-      get('goals', {}, Babar::Goal, false, *args)
-    end
-
-    def add_goal(hash_goal, *args)
-      modify_single('goal', 'add', hash_goal, Babar::Folder, false, *args)
-    end
-
-    def edit_goal(hash_goal, *args)
-      modify_single('goal', 'edit', hash_goal, Babar::Folder, false, *args)
-    end
-
-    def delete_goal(hash_goal, *args)
-      modify_single('goal', 'delete', hash_goal, Babar::Folder, false, *args)
-    end
-=end
-
     %w(context folder goal).each do |list|
       current_class = Babar::const_get(list.capitalize)
-      define_method("get_#{list}") { get("#{list}s", desired_class = current_class, delete_first_result = false) }
+      define_method("get_#{list}s") { get("#{list}s", param_map = {}, desired_class = current_class, delete_first_result = false) }
       %w(add edit delete).each do |mod_endp|
         #Hash_goal is a Hash representation of the (desired) list AFTER it is added/edited/deleted
         #TODO in the case of deletion, make sure an ID suffices
         define_method("#{mod_endp}_#{list}") { |hash_goal| modify_single( endpoint = "#{list}s", action = mod_endp, param_map = hash_goal, desired_class = current_class, delete_first_result = false)}
       end
     end
-
-      
-     
 
   end
 
