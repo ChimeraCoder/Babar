@@ -182,32 +182,7 @@ module Babar
       modify(endpoint, 'delete', desired_class, array_of_hashes, array_field_name, delete_first_result, *args)
     end
 
-
-    def get_locations(param_map={}, *args)
-      array_of_json_locations = get('locations', {}, *args)
-      array_of_json_locations.collect{|json_location| Babar::Location.new(self, json_location)}
-    end
-
-    def add_locations(single_location_hash, *args)
-      #TODO enforce :name presence
-      #Currently, it appears that the API only supports adding one location at a time
-      #However, this will be treated as a list, for the sake of modularity (and potential future compatibility)
-      list_of_hash_locations = [single_location_hash,] if list_of_hash_locations.is_a Hash
-      add('locations', Babar::Location, list_of_hash_locations, 'locations', false)
-    end
-
-    def edit_location(location_hash, *args)
-      #TODO UGH there is no symmetry between this and task batch editing.
-      location_hash[:key] = self.key
-      array_of_json_locs = JSON.parse("http://api.toodledo.com/2/locations/edit.php?" + parse_params(location_hash))
-      array_of_json_locs.collect{|json_loc| Babar::Location.new(self, json_loc)}
-    end
-
-    def delete_location(location_id)
-      JSON.parse(Typhoeus::Request.post("http://api.toodledo.com/2/locations/delete.php?id=#{location_id};key=#{self.key}").body)
-    end
-
-    %w(context folder goal).each do |list|
+    %w(context folder goal location).each do |list|
       current_class = Babar::const_get(list.capitalize)
       define_method("get_#{list}s") { get("#{list}s", param_map = {}, desired_class = current_class, delete_first_result = false) }
       %w(add edit delete).each do |mod_endp|
