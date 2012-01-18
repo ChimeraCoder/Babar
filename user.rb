@@ -46,6 +46,7 @@ module Babar
          result = @authenticator.send("edit_#{list}", params)
          self.send("#{list}s").store(result.id, result)
        end
+    end
 
         
 

@@ -169,6 +169,7 @@ module Babar
       #url = "http://api.toodledo.com/3/tasks/add.php?key=#{self.key};tasks=" + CGI::escape(post_params(list_of_hash_tasks, *args).gsub("\\", "").gsub(/\s?([\{\}])\s?/, '\1').gsub(/"\{/, '{').gsub(/\}"/, '}'))
       add('tasks', Babar::Task, list_of_hash_tasks, 'tasks', false)
     end
+
     def edit_tasks(list_of_hash_tasks, *args)
       #TODO implement error checking on :id and object type
       list_of_hash_tasks = [list_of_hash_tasks,] if list_of_hash_tasks.is_a Hash
@@ -195,7 +196,7 @@ module Babar
       add('locations', Babar::Location, list_of_hash_locations, 'locations', false)
     end
 
-    def edit_locations(location_hash, *args)
+    def edit_location(location_hash, *args)
       #TODO UGH there is no symmetry between this and task batch editing.
       location_hash[:key] = self.key
       array_of_json_locs = JSON.parse("http://api.toodledo.com/2/locations/edit.php?" + parse_params(location_hash))
