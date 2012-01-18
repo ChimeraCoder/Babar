@@ -35,16 +35,29 @@ module Babar
         @tasks[task.id] = task
     end
 
+    #TODO figure out what to do with the deleted object itself
+    def delete_task(id)
+      result = @authenticator.delete_tasks(id)
+      result.each{|del_task| @tasks.delete(del_task.id)}
+      result
+    end
+
     %w(context folder goal location).each do |list|
        define_method("new_#{list}") do |params|  
          #TODO figure out how to access instance variable by name properly
          result = @authenticator.send("add_#{list}", params)
          self.send("#{list}s").store(result.id, result)
        end
+
        define_method("edit_#{list}") do |params|
          raise ArgumentError if not params[:id] or params["id"]
          result = @authenticator.send("edit_#{list}", params)
          self.send("#{list}s").store(result.id, result)
+       end
+
+       define_method("delete_#{list}") do |id||
+         result = @authenticator.send("delete_#{list}", id)
+         result.each{|del_list| self.send("#{list}s").delete(del_list.id)}
        end
     end
 

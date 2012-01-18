@@ -3,7 +3,7 @@ module Babar
     attr_accessor :json_parsed, :toodledo
 
     def initialize(toodledo, json_parsed)
-      @toodledo, @json_parsed = toodledo, json_parsed
+      @authenticator, @json_parsed = toodledo, json_parsed
       #TODO add error message
       raise ArgumentError unless json_parsed["title"] or json_parsed[:title]
       @id = json_parsed["id"].to_i
@@ -16,12 +16,12 @@ module Babar
       fields = fields.collect!{|f| f.to_s}.join(',')
       
       #Merge will settle collisions in favor of the SECOND (retrieved) hash 
-      @json_parsed.merge!(@toodledo.query_tasks({:id => @id.to_s, :fields => fields}))
+      @json_parsed.merge!(@authenticator.query_tasks({:id => @id.to_s, :fields => fields}))
     end
 
     def refresh 
       #Removes all fields and reloads core fields (id, title. modified, completed). All other fields are retrieved lazily
-      @json_parsed = @toodledo.query_tasks( {:id => @id.to_s})
+      @json_parsed = @authenticator.query_tasks( {:id => @id.to_s})
     end
 
     def save
@@ -31,6 +31,10 @@ module Babar
       #Store the ID
     end
 
+    def delete
+      @authenticator.user.delete_task(@id)
+    end
+      
     def id
       @json_parsed['id']
     end
@@ -72,7 +76,7 @@ module Babar
       #TODO Debug potential nil case
       #FIXME query_tasks does not exist
       parent_task_json = self.query_tasks({:id => parent_id})
-      Babar::Task.new(@toodledo, parent_task_json)
+      Babar::Task.new(@authenticator, parent_task_json)
     end
 
     def parent_id

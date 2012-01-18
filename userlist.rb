@@ -19,7 +19,7 @@ module Babar
     def retrieve(field)
       #TODO figure out a less hacky way to do this
       #The module may be included in the class name, and we don't want that
-      class_name = self.class.name.split("::")[-1]
+      class_name = classname 
       ary = @authenticator.send("get_#{class_name}s".downcase)
       result = nil
       ary.each do |obj|
@@ -35,7 +35,12 @@ module Babar
 
     def delete
       #TODO implement this
-    end 
+      @authenticator.user.send("delete_#{classname}", self.id)
+    end
+
+    def classname
+      self.class.name.split("::")[-1]
+    end
 
   end
 end
