@@ -18,6 +18,9 @@ module Babar
       @brand_new = true
       @edited = false
       @deleted  = false
+
+      #TODO fold the time_edited into @edited, to avoid overlapping functionality
+      @modified = Time.at @json_parsed{"modified"]
     end
 
     def retrieve(field)

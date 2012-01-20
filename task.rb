@@ -14,7 +14,9 @@ module Babar
       @deleted = false
 
       #Has the task been edited locally since the last sync from the Toodledo server?
+      #TODO remove duplicate functionality
       @edited = false
+      @last_mod = Time.now
 
     end
 

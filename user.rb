@@ -105,20 +105,29 @@ module Babar
            #Get (recently edited) tasks
            tasks = @authenticator.get_tasks {:after => lastedit_task}
            
+           locally_edited = []
+
            #TODO we may need to put this in a loop and load tasks page by page
            tasks.each do |task|
              if not @tasks[task.id]
+               #If for some reason the task doesn't exist yet locally, add it
                @tasks[task.id] = task
              else
                  #Compare modification times, update local copy when necessary, and resolve editing conflicts
-                 #TODO allow either server-override-local or local-override-server
-                 if task.modified > @tasks[task.id].modified
-                   @tasks[task.id] = task
+                 #Do NOT use task.last_mod, because that will just refer to the time that the get_tasks function was called!
+                 #Instead, we care about the time that the last edits were actually saved on the Toodledo server
+                 if task.modified > @tasks[task.id].last_mod
+                   #The server-stored task was modified more recently than the local task
+                   #TODO make sure all other locations are properly mutating the task, rather than creating parallel/outdated instances
+                   #If we simply overwrote the task instead of updating task.json_parsed, any past references to the task would point to an invalid/outdated
+                   @tasks[task.id].json_parsed = task.json_parsed
+                   @tasks[task.id].edit_saved
+                 else
+                   #The local task was modified more recently than the server-stored task
+                   #Realistically, the two timestamps cannot be the same, but if they are, we will assume the local copy is more accurate
+                   locally_edited.push(@tasks[task.id])
                  end
              end
-
-             #The task has been edited more recently on the server, so no need to resync those changes back again
-             task.edit_saved
            end
         end
 
@@ -133,10 +142,18 @@ module Babar
         end
 
         #Find the tasks which were edited most recently locally, and send them to the Toodledo server
-        locally_edited = @tasks.keys.select{|task| task.edited?}
+        #Only tasks that were most recently modified locally will still return true for edited?
+        #TODO remove this duplicate code!
+        locally_edited = @tasks.keys.select{|task| task.edited? and not task.deleted?}
         @user.edit_tasks(locally_edited.collect{|task| task.json_parsed}) unless locally_edited.empty?
+       
+        #After this, the modified timestamp on the server will be the current time, which is later than the task.last_mod for any task stored locally
         
         #TODO check if there were repeating tasks that needed to be rescheduled
+        
+        #Remove any deleted tasks from @tasks. There may still be references elsewhere to them (depending on the application), so they may not necessarily be garbage-collected
+        @tasks = @tasks.select{|task| not task.deleted?}
+
         @last_task_sync = Time.now
     end
 
@@ -169,6 +186,7 @@ module Babar
             list.edit_saved
           end
         end
+       
 
         if lastedit_location > @last_location_sync
           lists = @authenticator.send("get_#{list}s")
