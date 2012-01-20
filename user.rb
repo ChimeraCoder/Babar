@@ -18,6 +18,27 @@ module Babar
       @locations {}
     end
 
+
+    def sync_tasks
+        #check if there are new tasks
+          #if so, add new tasks
+        #are there tasks to delete?
+          #If so, delete those tasks
+        #Is lastedit_task timestamp newer than last sync?
+          #If so, get the tasks
+          #Does the server have a task that you don't have?
+            #If so, add it
+          #Does a task exist in both places?
+            #If so, compare modification dates, update your copy when necessary, and resolve editing conflicts
+          #Is there another page of tasks?
+            #If so, repeat this block
+        #Is lastdelete_task timestamp newer than the last sync?
+          #If so, get deleted tasks
+          #Delete local copy of these tasks
+        #Are there tasks to be edited?
+          #If so, edit those tasks
+    end
+
     def new_task(params = {})
         #TODO figure out what to do about adding single/many tasks
         raise ArgumentError if not params[:title] or params["title"]
