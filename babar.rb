@@ -26,12 +26,14 @@ module Babar
 
     attr_accessor :session_token, :toodle_token_death
 
-    def initialize(toodle_uid, toodle_password, session_token = nil, toodle_token_death = nil)
+    def initialize(user_obj, toodle_uid, toodle_password, session_token = nil, toodle_token_death = nil)
       #TODO rethink this initialization
       #
       ##TODO Class-level initialization
       #
       #TODO implement uid lookup from email
+
+      @user = user_obj
       @toodle_uid = toodle_uid
       @toodle_password = toodle_password
 
@@ -109,7 +111,7 @@ module Babar
       array_of_results = JSON.parse(Typhoeus::Request.get(url).body)
       array_of_results.delete_at(0) if delete_first_result
       if desired_class
-        array_of_results.collect{|json_result| desired_class.new(self, json_result)}
+        array_of_results.collect{|json_result| desired_class.new(self.user, self, json_result)}
       else
         array_of_results
       end
@@ -120,7 +122,7 @@ module Babar
       array_of_results = JSON.parse(Typhoeus::Request.post(url).body)
       array_of_results.delete_at(0) if delete_first_result
       if desired_class
-        array_of_results.collect{|json_result| desired_class.new(self, json_result)}
+        array_of_results.collect{|json_result| desired_class.new(self.user, self, json_result)}
       else
         array_of_results
       end
@@ -134,7 +136,7 @@ module Babar
       url = "http://api.toodledo.com/2/#{endpoint}/#{action}.php?key=#{self.key};#{array_field_name}=" + CGI::escape(post_params(array_of_hashes, *args).gsub("\\", "").gsub(/\s?([\{\}])\s?/, '\1').gsub(/"\{/, '{').gsub(/\}"/, '}'))
       array_of_results = JSON.parse(Typhoeus::Request.post(url).body)
       array_of_results.delete_at(0) if delete_first_result
-      array_of_results.collect{|json_result| desired_class.new(self, json_result)}
+      array_of_results.collect{|json_result| desired_class.new(self.user, self, json_result)}
     end
 
 
@@ -159,10 +161,20 @@ module Babar
       get("tasks", param_map, Babar::Task, true, *args)
     end
 
+    def get_deleted_tasks(param_map, *args)
+      url = "http://api.toodledo.com/2/tasks/deleted.php?key=#{self.key};" + parse_params(param_map) 
+      deleted_tasks = JSON.parse(Typhoeus::Request.get(url).body)
+      deleted_tasks = deleted_tasks.delete_at(0)
+      deleted_tasks.collect{|json_result| Babar::Task.new(self.user, self, json_result)}
+    end
 
     def add_task(list_of_hash_tasks, *args)
-      #Can accept either a single task (as a Hash) or an Array of tasks (each represented as a Hash)
+      add_tasks([hash_task,])
+    end
+
+    def add_tasks(list_of_hash_tasks, *args)
       list_of_hash_tasks = [list_of_hash_tasks,] if list_of_hash_tasks.is_a Hash
+      #TODO make sure no more than 50 are added at once
       #TODO enforce presence of :title attribute
       #TODO fix ugly regexes
       #TODO use proper abstraction to call a general .add() method
