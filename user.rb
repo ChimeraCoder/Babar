@@ -34,6 +34,23 @@ module Babar
   ]
 
 
+  Accountfields = Set.new [:userid,
+                           :alias,
+                           :pro,
+                           :dateformat,
+                           :timezone,
+                           :hidemonths,
+                           :hotlistpriority,
+                           :hotlistduedate,
+                           :showtabnums,
+                           :lastedit_folder,
+                           :lastedit_context,
+                           :lastedit_goal,
+                           :lastedit_task,
+                           :lastdelete_task,
+                           :lastedit_notebook,
+                           :lastdelete_notebooks,
+  ]
 
 
   class User
@@ -48,6 +65,8 @@ module Babar
        @authenticator = Babar::Base.new(toodle_uid, toodle_password) 
       end
 
+      @account_info = @authenticator.get_account
+
       @tasks = {}
       @contexts = {}
       @goals = {}
@@ -59,6 +78,8 @@ module Babar
 
 
     def sync_tasks
+
+        @account_info = @authenticator.get_account
 
         #Add any tasks that needed to be added
         new_tasks = @tasks.select{|task| task.brand_new?}
@@ -108,8 +129,16 @@ module Babar
         #TODO check if there were repeating tasks that needed to be rescheduled
     end
 
+    #Define getters (no setters) for each of the account fields
+    Babar::Accountfields.each do |field|
+        define_method(field.to_s) do
+            retrieve field unless @account_info.has_key? field.to_s
+            @account_info[field.to_s]
+        end
+    end
+
     def lastedit_task
-        #TODO implement this
+        Time.at @account_info["lastedit_task"]
     end
 
     def lastdelete_task

@@ -117,6 +117,11 @@ module Babar
       end
     end
 
+    def get_account
+      url = "http://api.toodledo.com/2/account/get.php?key=#{self.key}"
+      JSON.parse(Typhoeus::Request.post(url).body)
+    end
+
     def modify_single(endpoint, action, param_map, desired_class=nil, delete_first_result=false)
       url = "http://api.toodledo.com/2/#{endpoint}/#{action}.php?key=#{self.key};" + parse_params(param_map) 
       array_of_results = JSON.parse(Typhoeus::Request.post(url).body)
