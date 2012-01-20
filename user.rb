@@ -87,6 +87,7 @@ module Babar
 
     def sync_tasks
 
+        #TODO make this line optional
         @account_info = @authenticator.get_account
 
         #Add any tasks that needed to be added
@@ -139,7 +140,13 @@ module Babar
         @last_task_sync = Time.now
     end
 
+    #For the time being, server overwrites local
+    #TODO implement bidrectional overwrite option
     def sync_locations
+        
+        @account_info = @authenticator.get_account
+
+
         #Add any new locations
         new_lists = @locations.keys.select{|list| list.brand_new}
         
@@ -150,8 +157,8 @@ module Babar
             list.no_longer_new!
           end
         end
-           
-       
+          
+        #Delete any deleted locations 
         del_lists = @locations.keys.select{|list| list.deleted}
 
         unless del_lists.empty?
@@ -167,16 +174,23 @@ module Babar
           lists = @authenticator.send("get_#{list}s")
           
           lists.each do |list|
-            if not @locations[list.id]
               @locations[list_id] = list
-            end
+              @locations[list_id].edit_saved
+          end
 
             #TODO implement proper conflict management  
             #TODO actually do this
 
+            foo bar this should not compile
+        end
 
+        #Any edits that were NOT overwritten previously will be sent to the server
+        #TODO right now EVERYTHING will be ovewritten, so NOTHING is sent to the server!
+        edit_lists.each do |list|
+          @authenticator.send("edit_#{list}", list.json_parsed)
+          list.edit_saved
+        end
 
-        #Send any edited locations to the server
         @last_location_sync = Time.now
     end 
 
