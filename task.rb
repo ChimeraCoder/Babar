@@ -1,12 +1,21 @@
 module Babar
   class Task
-    attr_accessor :json_parsed, :toodledo
+    attr_accessor :user, :json_parsed, :toodledo
 
-    def initialize(toodledo, json_parsed)
-      @authenticator, @json_parsed = toodledo, json_parsed
+    def initialize(user, toodledo, json_parsed)
+      @user, @authenticator, @json_parsed = toodledo, json_parsed
       #TODO add error message
       raise ArgumentError unless json_parsed["title"] or json_parsed[:title]
       @id = json_parsed["id"].to_i
+
+      @brand_new = true
+
+      #TODO check if this will cause problems when tasks are undeleted
+      @deleted = false
+
+      #Has the task been edited locally since the last sync from the Toodledo server?
+      @edited = false
+
     end
 
     def retrieve(fields)
@@ -24,59 +33,42 @@ module Babar
       @json_parsed = @authenticator.query_tasks( {:id => @id.to_s})
     end
 
-    def save
-      #TODO implement this
-      #Issue the POST request
-      #Store the actual JSON response that is returned as the result
-      #Store the ID
+    def edited?
+      @edited
     end
 
-    def delete
-      @authenticator.user.delete_task(@id)
-    end
-      
-    def id
-      @json_parsed['id']
+    def edit_saved
+      @edited = false
     end
 
-    def title
-      @json_parsed['title']
+    def delete!
+      @deleted = true
     end
 
-    def tag
-      #TODO check if this is correct
-      retrieve 'tag' unless @json_parsed.has_key?('tag')
-      @json_parsed['tag']
+    def deleted?
+      #TODO check if this introduces security error by returning a mutable value
+      @deleted
     end
 
-    def folder
-      retrieve 'folder' unless @json_parsed.has_key?('folder')
-      @json_parsed['folder'].to_i
+    def brand_new?
+      @brand_new
     end
 
-    def context
-      retrieve 'context' unless @json_parsed.has_key?('context')
-      @json_parsed['context'].to_i
+    def no_longer_new!
+      @brand_new = false
     end
+     
+    #Define the setter and getter methods for each of the API-defined fields 
+    Babar::Taskfields.each do |field|
+        define_method(field.to_s) do
+          retrieve field unless @json_parsed.has_key? field.to_s
+          @json_parsed[field.to_s]
+        end
 
-    def goal
-      #TODO debug potential nil error
-      #Returns 0 if no goal is defined
-      retrieve 'goal' unless @json_parsed.has_key?('goal')
-      @json_parsed['goal'].to_i
-    end
-
-
-    def location
-      retrieve 'location' unless @json_parsed.has_key?('location')
-      @json_parsed['location']
-    end
-
-    def parent
-      #TODO Debug potential nil case
-      #FIXME query_tasks does not exist
-      parent_task_json = self.query_tasks({:id => parent_id})
-      Babar::Task.new(@authenticator, parent_task_json)
+        define_method("#{field.to_s}=") do |new_val|
+          @json_parsed[field.to_s] = new_val
+          @edited = true 
+        end
     end
 
     def parent_id
@@ -84,108 +76,14 @@ module Babar
       id = @json_parsed['parent'].to_i
     end
 
-    def children
-      #Returns the *number* of children subtasks, not the child subtasks themselves
-      retrieve 'children' unless @json_parsed.has_key?('children')
-      @json_parsed['children'].to_i
-    end
-
-    def order
-      retrieve 'order' unless @json_parsed.has_key?('order')
-      @json_parsed['order'].to_i
-    end
-
-    def duedate
-      retrieve 'duedate' unless @json_parsed.has_key?('duedate')
-      Time.at @json_parsed['duedate'].to_i
-    end
-
-    def duedatemod
-      retrieve 'duedatemod' unless @json_parsed.has_key?('duedatemod')
-      @json_parsed['duedatemod']
-    end
-
-    def startdate
-      retrieve 'startdate' unless @json_parsed.has_key?('startdate')
-      Time.at @json_parsed['startdate']
-    end
-
-    def duetime
-      retrieve 'duetime' unless @json_parsed.has_key?('duetime')
-      Time.at @json_parsed['due_time']
-    end
-
     def duetime_set?
       retrieve 'duetime' unless @json_parsed.has_key?('duetime')
       @json_parsed['due_time'].to_i != 0
     end
 
-    def starttime
-      retrieve 'starttime' unless @json_parsed.has_key?('starttime')
-      Time.at @json_parsed['start_time']
-    end
-
     def starttime_set?
       retrieve 'starttime' unless @json_parsed.has_key?('starttime')
       @json_parsed['start_time'].to_i != 0
-    end
-
-    def remind
-      retrieve 'remind' unless @json_parsed.has_key?('remind')
-      @json_parsed['remind'].to_i
-    end
-
-    def remind?
-      retrieve 'remind' unless @json_parsed.has_key?('remind')
-      self.reminder != 0
-    end
-
-    def repeat
-      #TODO FIGURE THIS OUT
-    end
-    
-    def repeatfrom
-      retrieve 'repeatfrom' unless @json_parsed.has_key?('repeatfrom')
-      @json_parsed['repeatfrom'].to_i
-    end
-
-    def status
-      retrieve 'status' unless @json_parsed.has_key?('status')
-      @json_parsed['status'].to_i
-    end
-
-    def length
-      retrieve 'length' unless @json_parsed.has_key?('length')
-      @json_parsed['length'].to_i
-    end
-
-    def priority
-      retrieve 'priority' unless @json_parsed.has_key?('priority')
-      @json_parsed['priority'].to_i
-    end
-
-    def star
-      retrieve 'star' unless @json_parsed.has_key?('star')
-      if @json['star'] == "1"
-        return true
-      else
-        return false
-      end
-    end
-    
-    def modified
-      retrieve 'modified' unless @json_parsed.has_key?('modified')
-      Time.at @json_parsed['modified'].to_i
-    end
-
-    def completed?
-      retrieve 'completed' unless @json_parsed.has_key?('completed')
-      time = @json_parsed['completed']
-      if time == '0' or time == 0
-        return false
-      else
-        return true
-      end
     end
 
     def completion_time
@@ -197,30 +95,6 @@ module Babar
       end
     end
 
-    def added
-      retrieve 'added' unless @json_parsed.has_key?('added')
-      Time.at @json_parsed['added'].to_i
-    end
 
-    def timer
-      retrieve 'timer' unless @json_parsed.has_key?('timer')
-      @json_parsed['timer'].to_i
-    end
-
-    def timeron
-      #TODO figure out what the default value is
-      retrieve 'timeron' unless @json_parsed.has_key?('timeron')
-      @json_parsed['timeron'].to_i
-    end
-
-    def note
-      retrieve 'note' unless @json_parsed.has_key?('note')
-      @json_parsed['note']
-    end
-
-    def meta
-      retrieve 'meta' unless @json_parsed.has_key?('meta')
-      @json_parsed['meta']
-    end
   end
 end
