@@ -14,6 +14,10 @@ module Babar
     #The .new_#{foo} method will also hit the /add endpoint, so that this constructor can be used internally without infinite recursion
     def initialize(authenticator, json_parsed)
       @authenticator, @json_parsed = authenticator, json_parsed
+
+      @brand_new = true
+      @edited = false
+      @deleted  = false
     end
 
     def retrieve(field)
@@ -33,14 +37,34 @@ module Babar
       result.json_parsed.fetch(field, nil)
     end
 
-    def delete
-      #TODO implement this
-      @authenticator.user.send("delete_#{classname}", self.id)
-    end
-
     def classname
       self.class.name.split("::")[-1]
     end
 
+    def edited?
+      @edited
+    end
+
+    def edit_saved
+      @edited = false
+    end
+
+    def delete!
+      @deleted = true
+    end
+
+    def deleted?
+      #TODO check if this introduces security error by returning a mutable value
+      @deleted
+    end
+
+    def brand_new?
+      @brand_new
+    end
+
+    def no_longer_new!
+      @brand_new = false
+    end
+     
   end
 end

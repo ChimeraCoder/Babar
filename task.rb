@@ -89,7 +89,7 @@ module Babar
     def completion_time
       if completed?
         return Time.at @json_parsed['completed'].to_i
-      else
+      
         #TODO find an exception type for this
         nil
       end

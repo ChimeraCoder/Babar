@@ -34,24 +34,31 @@ module Babar
   ]
 
 
-  Accountfields = Set.new [:userid,
-                           :alias,
-                           :pro,
-                           :dateformat,
-                           :timezone,
-                           :hidemonths,
-                           :hotlistpriority,
-                           :hotlistduedate,
-                           :showtabnums,
-                           :lastedit_folder,
-                           :lastedit_context,
-                           :lastedit_goal,
-                           :lastedit_task,
-                           :lastdelete_task,
-                           :lastedit_notebook,
-                           :lastdelete_notebooks,
+
+  Accounttextfields = Set.new [:userid,
+                               :alias,
+                               :pro,
+                               :dateformat,
+                               :timezone,
+                               :hidemonths,
+                               :hotlistpriority,
+                               :hotlistduedate,
+                               :showtabnums,
   ]
 
+
+  Accounttimestamps = Set.new [ 
+                               :lastedit_folder,
+                               :lastedit_context,
+                               :lastedit_goal,
+                               :lastedit_task,
+                               :lastdelete_task,
+                               :lastedit_notebook,
+                               :lastdelete_notebooks,
+
+  ]
+
+  Accountfields = Accounttimestamps.union Accounttextfields 
 
   class User
    
@@ -73,7 +80,8 @@ module Babar
       @folders = {}
       @locations {}
 
-      @last_sync = Time.now
+      @last_task_sync = Time.now
+      @last_location_sync = Time.now
     end
 
 
@@ -82,17 +90,17 @@ module Babar
         @account_info = @authenticator.get_account
 
         #Add any tasks that needed to be added
-        new_tasks = @tasks.select{|task| task.brand_new?}
+        new_tasks = @tasks.keys.select{|task| task.brand_new?}
         @authenticator.add_tasks(new_tasks.collect {|task| task.json_parsed}) unless @new_tasks.new_tasks.empty?
 
         #Record that the tasks have already been added
         new_tasks.each {|task| task.no_longer_new}
 
         #Delete any tasks that were marked as deleted locally but not yet removed from @tasks
-        deleted_tasks = @tasks.select{|task| task.deleted?}
+        deleted_tasks = @tasks.keys.select{|task| task.deleted?}
         @authenticator.delete_tasks(deleted_tasks.collect {|task| task.id}) unless deleted_tasks.empty?
       
-        if lastedit_task > @last_sync
+        if lastedit_task > @last_task_sync
            #Get (recently edited) tasks
            tasks = @authenticator.get_tasks {:after => lastedit_task}
            
@@ -113,36 +121,76 @@ module Babar
            end
         end
 
-        if lastdelete_task > @last_sync
+        if lastdelete_task > @last_task_sync
           #Query the deleted tasks (on the Toodledo server) and delete them here locally
           @user.get_deleted_tasks.collect{|task| task.id}.each do |id| 
             #The delete boolean will be set just in case there are other references to the task, in which case it would not be garbage-collected
             @tasks[id].delete!
+            @tasks[id].edit_saved #Make sure it won't be edited-saved in the future
             @tasks.delete(id)
           end
         end
 
         #Find the tasks which were edited most recently locally, and send them to the Toodledo server
-        locally_edited = @tasks.select{|task| task.edited?}
+        locally_edited = @tasks.keys.select{|task| task.edited?}
         @user.edit_tasks(locally_edited.collect{|task| task.json_parsed}) unless locally_edited.empty?
         
         #TODO check if there were repeating tasks that needed to be rescheduled
+        @last_task_sync = Time.now
     end
+
+    def sync_locations
+        #Add any new locations
+        new_lists = @locations.keys.select{|list| list.brand_new}
+        
+        #TODO rewrite this to use only one API query
+        unless new_lists.empty?  
+          new_lists.each do |list| 
+            @authenticator.send("add_#{list}", list.json_parsed)
+            list.no_longer_new!
+          end
+        end
+           
+       
+        del_lists = @locations.keys.select{|list| list.deleted}
+
+        unless del_lists.empty?
+          del_lists.each do |list|
+            @authenticator.send("delete_#{list}", list.json_parsed)}
+            @locations.delete(list.id)
+            list.delete!
+            list.edit_saved
+          end
+        end
+
+        if lastedit_location > @last_location_sync
+          lists = @authenticator.send("get_#{list}s")
+          
+          lists.each do |list|
+            if not @locations[list.id]
+              @locations[list_id] = list
+            end
+
+            #TODO implement proper conflict management  
+            #TODO actually do this
+
+
+
+        #Send any edited locations to the server
+        @last_location_sync = Time.now
+    end 
+
+
 
     #Define getters (no setters) for each of the account fields
     Babar::Accountfields.each do |field|
         define_method(field.to_s) do
-            retrieve field unless @account_info.has_key? field.to_s
-            @account_info[field.to_s]
+            if field in Babar::Accounttimestamps
+              Time.at @account_info[field.to_s]
+            else
+              @account_info[field.to_s]
+            end
         end
-    end
-
-    def lastedit_task
-        Time.at @account_info["lastedit_task"]
-    end
-
-    def lastdelete_task
-        #TODO implement this
     end
 
     def new_task(params = {})

@@ -31,7 +31,7 @@ module Babar
             @json_parsed.fetch(field, nil) || retrieve(field)
           end
           #The following syntax only works in Ruby 1.9 and above
-          define_method "#{field}=" do |value, sync_now = false|
+          define_method "#{field}=" do |value|
             @json_parsed[field] = value
             synchronize if sync_now
           end
