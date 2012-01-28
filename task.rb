@@ -2,6 +2,18 @@ module Babar
   class Task
     attr_accessor :user, :json_parsed, :toodledo
 
+    @@instances = {}
+
+    #This indirect initialization is necessary to ensure that two separate Task instances cannot have the same userid-taskid combination
+    #An attempt to create a new Task instance with an existing userid-taskid combination will return the existing instance
+    def new(user, toodledo, json_parsed)
+      key = [user.userid, json_parsed["id"].to_i]
+      return @@instances[key] if @@instances.has_key? key and @@instances[key].weakref_alive?
+      instance = self.allocate
+      instance.send :initialize user, toodledo, json_parsed
+      return instance
+    end
+
     def initialize(user, toodledo, json_parsed)
       @user, @authenticator, @json_parsed = toodledo, json_parsed
       #TODO add error message
@@ -18,6 +30,12 @@ module Babar
       @edited = false
       @last_mod = Time.now
 
+      #Task ids are only guaranteed to be unique to a user, so both userid and task id must be used as the key
+      #Freeze the array so it can be used as a key (since Ruby does not support tuples)
+      instance_key = [@user.userid, @id].freeze
+
+      #Use a weakref or else the object will never be garbage-collected!
+      @@instances[instance_key] = Weakref.new(self)
     end
 
     def retrieve(fields)
