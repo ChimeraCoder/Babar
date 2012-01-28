@@ -240,9 +240,8 @@ module Babar
         #TODO will this work if it is not public?
         self.send("last#{list_type}_sync=", Time.now)
         
-        #Remove all locally deleted lists
-        @locations = @locations.values.select{|list| not list.deleted}
-
+        #Remove all locally deleted lists of this type
+        self.send("#{list_type}s=", lists_array.values.select{|list| not list.deleted})
     end 
 
 
