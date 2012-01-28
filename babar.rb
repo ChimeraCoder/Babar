@@ -58,14 +58,13 @@ module Babar
       @session_token
     end
 
-    #TODO make this a class method
     def refresh_session_token
-        session_signature = Digest::MD5.hexdigest(@toodle_uid + Babar::Base.toodle_app_token) 
-        session_token_url = "http://api.toodledo.com/2/account/token.php?" + self.parse_params({:userid => @toodle_uid, :appid => Babar::Base.toodle_app_id , :sig => session_signature,})
-        puts session_signature, session_token_url
-        @session_token = JSON.parse(Typhoeus::Request.get(session_token_url).body)["token"]
-        @toodle_token_death = Time.now + Babar::Base.toodle_app_token_lifetime
-        [@session_token, @toodle_token_death]
+      session_signature = Digest::MD5.hexdigest(@toodle_uid + Babar::Base.toodle_app_token) 
+      session_token_url = "http://api.toodledo.com/2/account/token.php?" + self.parse_params({:userid => @toodle_uid, :appid => Babar::Base.toodle_app_id , :sig => session_signature,})
+      puts session_signature, session_token_url
+      @session_token = JSON.parse(Typhoeus::Request.get(session_token_url).body)["token"]
+      @toodle_token_death = Time.now + Babar::Base.toodle_app_token_lifetime
+      [@session_token, @toodle_token_death]
     end
 
     def token_valid?
@@ -74,7 +73,6 @@ module Babar
 
     def key
       refresh_key unless key_valid?
-      #TODO figure out how to refresh key correctly
       @key
     end
 
@@ -146,19 +144,15 @@ module Babar
 
 
     def add(endpoint, desired_class, array_of_hashes, array_field_name, delete_first_result, *args)
-      #url = "http://api.toodledo.com/2/#{endpoint}/add.php?key=#{self.key};#{array_field_name}=" + CGI::escape(post_params(array_of_hashes, *args).gsub("\\", "").gsub(/\s?([\{\}])\s?/, '\1').gsub(/"\{/, '{').gsub(/\}"/, '}'))
       modify(endpoint, 'add', desired_class, array_of_hashes, array_field_name, delete_first_result, *args)
     end
 
     def edit(endpoint, desired_class, array_of_hashes, array_field_name, delete_first_result, *args)
       modify(endpoint, 'edit', desired_class, array_of_hashes, array_field_name, delete_first_result, *args)
-      #url = "http://api.toodledo.com/2/#{endpoint}/edit.php?key=#{self.key};#{array_field_name}=" + CGI::escape(post_params(array_of_hashes, *args).gsub("\\", "").gsub(/\s?([\{\}])\s?/, '\1').gsub(/"\{/, '{').gsub(/\}"/, '}'))
     end
 
     def delete(endpoint, desired_class, array_of_hashes, array_field_name, delete_first_result, *args)
       modify(endpoint, 'delete', desired_class, array_of_hashes, array_field_name, delete_first_result, *args)
-      #url = "http://api.toodledo.com/2/#{endpoint}/delete.php?key=#{self.key};" + post_params(list_of_hash_endpoint_objs, *args) 
-      Typhoeus::Request.post(url)
     end
     
     def get_tasks(param_map, *args)
@@ -173,23 +167,28 @@ module Babar
       deleted_tasks.collect{|json_result| Babar::Task.new(self.user, self, json_result)}
     end
 
-    def add_task(list_of_hash_tasks, *args)
-      add_tasks([hash_task,])
+    def add_task(hash_task, *args)
+      add_tasks([hash_task,], *args)
     end
 
     def add_tasks(list_of_hash_tasks, *args)
       list_of_hash_tasks = [list_of_hash_tasks,] if list_of_hash_tasks.is_a Hash
-      #TODO make sure no more than 50 are added at once
-      #TODO enforce presence of :title attribute
-      #TODO fix ugly regexes
-      #TODO use proper abstraction to call a general .add() method
-      #url = "http://api.toodledo.com/3/tasks/add.php?key=#{self.key};tasks=" + CGI::escape(post_params(list_of_hash_tasks, *args).gsub("\\", "").gsub(/\s?([\{\}])\s?/, '\1').gsub(/"\{/, '{').gsub(/\}"/, '}'))
+      raise ArgumentError, 'Only 50 tasks may be added in a single call' if list_of_hash_tasks.length > 50
+      list_of_hash_tasks.each do |task|
+        raise ArgumentError, 'A title must be specified when a task is added' if unless task.has_key? :title or task.has_key 'title'
+      end
       add('tasks', Babar::Task, list_of_hash_tasks, 'tasks', false)
     end
 
+    def edit_task(hash_task, *args)
+      edit_tasks([hash_task,], *args)
+    end
+
     def edit_tasks(list_of_hash_tasks, *args)
-      #TODO implement error checking on :id and object type
       list_of_hash_tasks = [list_of_hash_tasks,] if list_of_hash_tasks.is_a Hash
+      list_of_hash_tasks.each do |task|
+        raise ArgumentError, 'An id must be specified when a task is edited' if unless task.has_key? :id or task.has_key 'id'
+      end
       edit("tasks", Babar::Task, list_of_hash_tasks, 'tasks', false, *args)
     end
 
