@@ -34,7 +34,8 @@ module Babar
   ]
 
 
-
+ 
+  #Account fields (except those that should be stored as Time objects)
   Accounttextfields = Set.new [:userid,
                                :alias,
                                :pro,
@@ -46,7 +47,7 @@ module Babar
                                :showtabnums,
   ]
 
-
+  #Account fields that should be stored as Time objects
   Accounttimestamps = Set.new [ 
                                :lastedit_folder,
                                :lastedit_context,
@@ -82,6 +83,10 @@ module Babar
 
       @last_task_sync = Time.now
       @last_location_sync = Time.now
+      @last_context_sync = Time.now
+      @last_goal_sync = Time.now
+      @last_folder_sync = Time.now
+
     end
 
 
@@ -113,20 +118,20 @@ module Babar
                #If for some reason the task doesn't exist yet locally, add it
                @tasks[task.id] = task
              else
-                 #Compare modification times, update local copy when necessary, and resolve editing conflicts
-                 #Do NOT use task.last_mod, because that will just refer to the time that the get_tasks function was called!
-                 #Instead, we care about the time that the last edits were actually saved on the Toodledo server
-                 if task.modified > @tasks[task.id].last_mod
-                   #The server-stored task was modified more recently than the local task
-                   #TODO make sure all other locations are properly mutating the task, rather than creating parallel/outdated instances
-                   #If we simply overwrote the task instead of updating task.json_parsed, any past references to the task would point to an invalid/outdated
-                   @tasks[task.id].json_parsed = task.json_parsed
-                   @tasks[task.id].edit_saved
-                 else
-                   #The local task was modified more recently than the server-stored task
-                   #Realistically, the two timestamps cannot be the same, but if they are, we will assume the local copy is more accurate
-                   locally_edited.push(@tasks[task.id])
-                 end
+               #Compare modification times, update local copy when necessary, and resolve editing conflicts
+               #Do NOT use task.last_mod, because that will just refer to the time that the get_tasks function was called!
+               #Instead, we care about the time that the last edits were actually saved on the Toodledo server
+               if task.modified > @tasks[task.id].last_mod
+                 #The server-stored task was modified more recently than the local task
+                 #TODO make sure all other locations are properly mutating the task, rather than creating parallel/outdated instances
+                 #If we simply overwrote the task instead of updating task.json_parsed, any past references to the task would point to an invalid/outdated
+                 @tasks[task.id].json_parsed = task.json_parsed
+                 @tasks[task.id].edit_saved
+               else
+                 #The local task was modified more recently than the server-stored task
+                 #Realistically, the two timestamps cannot be the same, but if they are, we will assume the local copy is more accurate
+                 locally_edited.push(@tasks[task.id])
+               end
              end
            end
         end
@@ -141,10 +146,7 @@ module Babar
           end
         end
 
-        #Find the tasks which were edited most recently locally, and send them to the Toodledo server
-        #Only tasks that were most recently modified locally will still return true for edited?
-        #TODO remove this duplicate code!
-        locally_edited = @tasks.keys.select{|task| task.edited? and not task.deleted?}
+        locally_edited = locally_edited.select{|task| not task.deleted?}
         @user.edit_tasks(locally_edited.collect{|task| task.json_parsed}) unless locally_edited.empty?
        
         #After this, the modified timestamp on the server will be the current time, which is later than the task.last_mod for any task stored locally
@@ -157,59 +159,90 @@ module Babar
         @last_task_sync = Time.now
     end
 
-    #For the time being, server overwrites local
-    #TODO implement bidrectional overwrite option
-    def sync_locations
-        
+
+
+
+
+    def sync_list(list_type)
+       
+        #Update account_info 
+        #TODO make sure this isn't called four times if all lists are syncghronized together
         @account_info = @authenticator.get_account
 
+        
+        #lists_array is the array that stores the user's lists of the given type
+        #For example, @locations
+        
+        lists_array = self.send("#{list_type}s")
+        
 
         #Add any new locations
-        new_lists = @locations.keys.select{|list| list.brand_new}
+        new_lists = lists_array.keys.select{|list| list.brand_new}
         
-        #TODO rewrite this to use only one API query
-        unless new_lists.empty?  
+        #TODO rewrite this to use only one API query, if API supports it
+        unless new_lists.empty?  #Won't be redundant if/when the loop is eliminated
           new_lists.each do |list| 
-            @authenticator.send("add_#{list}", list.json_parsed)
+            @authenticator.send("add_#{list_type}", list.json_parsed)
             list.no_longer_new!
           end
         end
           
         #Delete any deleted locations 
-        del_lists = @locations.keys.select{|list| list.deleted}
+
+        #Get all the lists that have been deleted locally 
+        del_lists = lists_array.values.select{|list| list.deleted}
 
         unless del_lists.empty?
           del_lists.each do |list|
-            @authenticator.send("delete_#{list}", list.json_parsed)}
-            @locations.delete(list.id)
+            @authenticator.send("delete_#{list_type}", list.json_parsed)}
+            lists_array.delete(list.id)
             list.delete!
             list.edit_saved
           end
         end
        
+        #TODO delete the lists locally if they have been deleted on the server
 
-        if lastedit_location > @last_location_sync
+        #Only fetch from server and do conflict resolution if the last edit on the server was later than the last sync for the list
+       
+        if self.send("lastedit_#{list_type}") > self.send("last_#{list_type}_sync") 
+
+          #Get the lists
           lists = @authenticator.send("get_#{list}s")
+
+          locally_edited = []
           
           lists.each do |list|
-              @locations[list_id] = list
-              @locations[list_id].edit_saved
+            if not lists_array[list.id]
+              #If for some reason we don't have the list locally, store the list locally and move on.
+              lists_array[list.id]
+            else
+              #Otherwise, compare modification times, update local copy when necessary, and resolve editing conflicts
+              
+              if self.send("lastedit_#{list}") > lists_array[task.id].last_mod
+                #The server-stored list was modified more recently than the local task
+                #TODO make sure the list object is unique by ID
+                
+                lists_array[list.id].json_parsed = list.json_parsed
+                lists_array[list.id].edit_saved
+              else
+                #The local list was modified more recently than the server-stored task
+                #Assume the local copy is more accurate if the two timestamps are somehow the same
+                locally_edited.push(lists_array[task.id])
+                @authenticator.send("edit_#{list}", list.json_parsed) unless list.deleted?
+                list.edit_saved
+              end
+            end
           end
-
-            #TODO implement proper conflict management  
-            #TODO actually do this
-
-            foo bar this should not compile
         end
 
-        #Any edits that were NOT overwritten previously will be sent to the server
-        #TODO right now EVERYTHING will be ovewritten, so NOTHING is sent to the server!
-        edit_lists.each do |list|
-          @authenticator.send("edit_#{list}", list.json_parsed)
-          list.edit_saved
-        end
 
-        @last_location_sync = Time.now
+        #TODO will this work if it is not public?
+        self.send("last#{list_type}_sync=", Time.now)
+        
+        #Remove all locally deleted lists
+        @locations = @locations.values.select{|list| not list.deleted}
+
     end 
 
 
@@ -217,6 +250,7 @@ module Babar
     #Define getters (no setters) for each of the account fields
     Babar::Accountfields.each do |field|
         define_method(field.to_s) do
+            #The timestamps should be stored as Time objects
             if field in Babar::Accounttimestamps
               Time.at @account_info[field.to_s]
             else
@@ -226,17 +260,20 @@ module Babar
     end
 
     def new_task(params = {})
-        #TODO figure out what to do about adding single/many tasks
         raise ArgumentError if not params[:title] or params["title"]
 
         params.keys.each do |key|
           raise ArgumentError if not Taskfields.include? key.to_sym
         end
 
-        #Query the API to add the task
+        #Create a new Task object and push it onto the array of tasks to be added upon the next sync
         task = Babar::Task.new(@authenticator, params) 
         @new_tasks.push(task)
         @tasks[task.id] = task
+    end
+
+    def add_tasks(tasklist)
+        tasklist.each{ |task| new_task(task)}
     end
 
     %w(context folder goal location).each do |list|
