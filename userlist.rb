@@ -25,6 +25,8 @@ module Babar
       @last_mod = nil
     end
 
+    ##
+    #Query the Toodledo API to refresh all fields for the UserList object, and return the specified field (or nil if it does not exist)
     def retrieve(field)
       #TODO figure out a less hacky way to do this
       #The module may be included in the class name, and we don't want that
@@ -42,14 +44,22 @@ module Babar
       result.json_parsed.fetch(field, nil)
     end
 
+    ##
+    #Return the class name of the object (not including the module name)
+    #--
+    #TODO find a less hacky way?
     def classname
       self.class.name.split("::")[-1]
     end
 
+    ##
+    # Return a boolean indicating whether the list has been modified locally since the last sync  (returns true unless @last_mod is nil)
     def edited?
       @last_mod ? true : false 
     end
 
+    ##
+    #Return the time at which the task was last modified locally, or nil if the task has not been modified locally since the last sync
     def last_mod
       @last_mod
     end
@@ -58,15 +68,21 @@ module Babar
       @last_mod = nil
     end
 
+    ##
+    #Delete the UserList. Deletion will occur on the next synchronization with the Toodledo server 
     def delete!
       @deleted = true
     end
 
+    ##
+    #Return a boolean indicating whether the current list has been marked for deletion
     def deleted?
       #TODO check if this introduces security error by returning a mutable value
       @deleted
     end
 
+    ##
+    #Return a boolean indicating whether the list has been synchronized since it was created locally
     def brand_new?
       @brand_new
     end

@@ -30,6 +30,10 @@ module Babar
     end
 
 
+    ##
+    #Synchronize the user's Task objects stored locally with the Toodledo server.
+    #Keep the most recently modified version.
+
     def sync_tasks
 
         #TODO make this line optional
@@ -101,6 +105,9 @@ module Babar
 
 
 
+    ##
+    #Synchronize the user's List objects stored locally with the Toodledo server.
+    #Keep the most recently modified version.
 
 
     def sync_list(list_type)
@@ -182,6 +189,9 @@ module Babar
         
         #Remove all locally deleted lists of this type
         self.send("#{list_type}s=", lists_array.values.select{|list| not list.deleted})
+
+        #All of the lists have now been synchronized since they were last created
+        self.send("#{list_type}s").each{|list| list.no_longer_new!}
     end 
 
 
@@ -198,6 +208,9 @@ module Babar
         end
     end
 
+    ## Create a new Task for the specified user, using the values from the Hash
+    #
+
     def new_task(params = {})
         raise ArgumentError if not params[:title] or params["title"]
 
@@ -211,9 +224,13 @@ module Babar
         @tasks[task.id] = task
     end
 
+    ## Create several new Tasks for the user, using the values from the list of Hashes
     def add_tasks(tasklist)
         tasklist.each{ |task| new_task(task)}
     end
+
+    ## Create new/edit/delete methods for each of the Toodledo User-defined lists: Folder, Context, Goal, Location
+    #
 
     %w(context folder goal location).each do |list|
        define_method("new_#{list}") do |params|  
