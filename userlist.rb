@@ -19,8 +19,10 @@ module Babar
       @edited = false
       @deleted  = false
 
-      #TODO fold the time_edited into @edited, to avoid overlapping functionality
-      @modified = Time.at @json_parsed{"modified"]
+      #TODO fold last_mod into @edited, to avoid overlapping functionality
+      #This records the last time modified LOCALLY
+      #Will be nil if there have been no local modifications since the last sync
+      @last_mod = nil
     end
 
     def retrieve(field)
@@ -45,11 +47,15 @@ module Babar
     end
 
     def edited?
-      @edited
+      @last_mod ? true : false 
+    end
+
+    def last_mod
+      @last_mod
     end
 
     def edit_saved
-      @edited = false
+      @last_mod = nil
     end
 
     def delete!
